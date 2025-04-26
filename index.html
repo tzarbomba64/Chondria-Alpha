@@ -1,24 +1,16 @@
-<!DOCTYPE html><!DOCTYPE html><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Chondria-Alpha Client</title>
+    <title>Chondria-Alpha Key Log</title>
     <style>
         body { font-family: Arial, sans-serif; background: #121212; color: #eee; padding: 20px; }
-        #log { background: #1e1e1e; padding: 10px; height: 200px; overflow-y: auto; margin-bottom: 10px; }
-        #chat { margin-top: 20px; }
-        input[type="text"] { width: 80%; padding: 10px; }
-        button { padding: 10px; }
+        #log { background: #1e1e1e; padding: 10px; height: 90vh; overflow-y: auto; }
     </style>
 </head>
 <body>
-    <h1>Chondria-Alpha</h1>
-    <div id="log"></div>
-
-    <div id="chat">
-        <input type="text" id="message" placeholder="Type your message...">
-        <button onclick="sendMessage()">Send</button>
-    </div>
+    <h1>Chondria-Alpha - Key Log</h1>
+    <div id="log">Loading keys...</div>
 
     <script>
         const logDiv = document.getElementById('log');
@@ -33,30 +25,17 @@
                         div.textContent = key;
                         logDiv.appendChild(div);
                     });
-                });
-        }
-
-        function sendMessage() {
-            const messageInput = document.getElementById('message');
-            const message = messageInput.value.trim();
-            if (message !== "") {
-                fetch('/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message })
                 })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.response) {
-                        console.log('Chondria-Alpha:', data.response);
-                    }
-                    messageInput.value = '';
-                    updateLog();
+                .catch(error => {
+                    console.error('Failed to fetch keys:', error);
                 });
-            }
         }
 
+        // Update keys every 5 seconds
         setInterval(updateLog, 5000);
+
+        // Initial load
+        updateLog();
     </script>
 </body>
 </html>
