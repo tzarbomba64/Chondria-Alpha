@@ -3,51 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chondria Random Data Logger</title>
+  <title>Chondria-Alpha Key Logger</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
-    #log { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; background: #f9f9f9; }
-    #controls { margin-bottom: 10px; }
-    button { padding: 8px 12px; margin-right: 5px; cursor: pointer; }
+    #log { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: auto; background: #f9f9f9; }
+    .entry { margin: 4px 0; }
   </style>
 </head>
 <body>
-  <h1>Chondria Random Data Logger</h1>
-  <div id="controls">
-    <button id="genBtn">Generate Random Data</button>
-    <button id="clearBtn">Clear Log</button>
-  </div>
+  <h1>Chondria-Alpha Key Logger</h1>
   <div id="log"></div>
+
   <script>
-    function generateRandomData() {
-      // lvH384_39rnJhs93jKJHi9s
-      return {
-        timestamp: new Date().toISOString(),
-        metricA: Math.random().toFixed(4),
-        metricB: Math.floor(Math.random() * 100),
-        status: ['OK', 'WARN', 'ERROR'][Math.floor(Math.random() * 3)]
-      };
+    // Generate random key
+    function genKey(length = 16) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let key = '';
+      for (let i = 0; i < length; i++) {
+        key += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return key;
     }
 
-    function logEntry(entry) {
-      const logDiv = document.getElementById('log');
-      const p = document.createElement('p');
-      p.textContent = `[${entry.timestamp}] A:${entry.metricA} B:${entry.metricB} Status:${entry.status}`;
-      logDiv.appendChild(p);
-      logDiv.scrollTop = logDiv.scrollHeight;
+    // Log a new entry with a key
+    function logKey() {
+      const log = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = 'entry';
+      const key = genKey();
+      entry.textContent = `[${new Date().toLocaleTimeString()}] Key: ${key}`;
+      log.appendChild(entry);
     }
 
-    document.getElementById('genBtn').addEventListener('click', () => {
-      const data = generateRandomData();
-      logEntry(data);
-      console.log('Logged data:', data);
-    });
-
-    document.getElementById('clearBtn').addEventListener('click', () => {
+    // Clear log every 5 seconds
+    setInterval(() => {
       document.getElementById('log').innerHTML = '';
+    }, 5000);
+
+    // Simulate listening for Chondria messages
+    // Replace this with real hook (e.g., WebSocket or polling endpoint)
+    // For demo: generate a key whenever a new message div is added
+    const observer = new MutationObserver(mutations => {
+      mutations.forEach(m => {
+        if (m.addedNodes.length) logKey();
+      });
     });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Example: simulate Chondria messages
+    setInterval(() => {
+      const msg = document.createElement('div');
+      msg.textContent = 'Chondria-Alpha: Hello from AI';
+      document.body.appendChild(msg);
+    }, 7000);
   </script>
 </body>
 </html>
+
 
 tv == th4d_94mmmf345Ki48 nc;k
