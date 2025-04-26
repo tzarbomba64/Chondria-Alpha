@@ -1,64 +1,208 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chondria-Alpha Key Logger</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    #log { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: auto; background: #f9f9f9; }
-    .entry { margin: 4px 0; }
-  </style>
-</head>
-<body>
-  <h1>Chondria-Alpha Key Logger</h1>
-  <div id="log"></div>
+#!/usr/bin/env python3
+import os
+import sys
+import json
+import traceback
+import threading
+import asyncio
+import random
+import string
+from pathlib import Path
 
-  <script>
-    // Generate random key
-    function genKey(length = 16) {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_';
-      let key = '';
-      for (let i = 0; i < length; i++) {
-        key += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      return key;
-    }
+# Suppress logs
+import logging
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
-    // Log a new entry with a key
-    function logKey() {
-      const log = document.getElementById('log');
-      const entry = document.createElement('div');
-      entry.className = 'entry';
-      const key = genKey();
-      entry.textContent = `[${new Date().toLocaleTimeString()}] Key: ${key}`;
-      log.appendChild(entry);
-    }
+# Embeddings & retrieval
+from sentence_transformers import SentenceTransformer
+try:
+    import faiss
+    _USE_FAISS = True
+except ImportError:
+    import numpy as np
+    _USE_FAISS = False
 
-    // Clear log every 5 seconds
-    setInterval(() => {
-      document.getElementById('log').innerHTML = '';
-    }, 5000);
+# Grammar correction
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, pipeline as hf_pipeline
+# Generation
+from transformers import AutoModelForCausalLM, AutoTokenizer as GenTokenizer, TextGenerationPipeline
+# Websocket server
+import websockets
 
-    // Simulate listening for Chondria messages
-    // Replace this with real hook (e.g., WebSocket or polling endpoint)
-    // For demo: generate a key whenever a new message div is added
-    const observer = new MutationObserver(mutations => {
-      mutations.forEach(m => {
-        if (m.addedNodes.length) logKey();
-      });
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+CACHE_FILE = "cache.json"
+DATA_FILE = "data.json"
+WORD_FILE = "word.json"
+PRE_FILE  = "pre.json"
 
-    // Example: simulate Chondria messages
-    setInterval(() => {
-      const msg = document.createElement('div');
-      msg.textContent = 'Chondria-Alpha: Hello from AI';
-      document.body.appendChild(msg);
-    }, 7000);
-  </script>
-</body>
-</html>
+# Global Websocket clients set and loop handle
+t_clients = set()
+ws_loop = None
 
+async def ws_handler(websocket, path):
+    t_clients.add(websocket)
+    try:
+        await websocket.wait_closed()
+    finally:
+        t_clients.remove(websocket)
+
+async def broadcast(key):
+    to_remove = set()
+    for ws in t_clients:
+        try:
+            await ws.send(key)
+        except:
+            to_remove.add(ws)
+    for ws in to_remove:
+        t_clients.discard(ws)
+
+def start_ws_server():
+    global ws_loop
+    ws_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(ws_loop)
+    server = websockets.serve(ws_handler, 'localhost', 8765)
+    ws_loop.run_until_complete(server)
+    ws_loop.run_forever()
+
+# Cache load/save
+def load_cache():
+    try:
+        return json.load(open(CACHE_FILE, 'r', encoding='utf-8'))
+    except:
+        return {"memories": []}
+
+def save_cache(cache):
+    try:
+        json.dump(cache, open(CACHE_FILE, 'w', encoding='utf-8'), indent=2)
+    except:
+        pass
+
+# Load JSON
+def load_json(path):
+    try:
+        return json.load(open(path, 'r', encoding='utf-8'))
+    except:
+        return []
+
+# Load texts from manifest
+
+def load_texts(manifest):
+    texts = []
+    folder = Path('data_files')
+    folder.mkdir(exist_ok=True)
+    for entry in manifest:
+        url = entry.get('url') if isinstance(entry, dict) else entry
+        path = Path(folder) / os.path.basename(url)
+        if path.exists():
+            try:
+                texts.append(path.read_text(encoding='utf-8', errors='ignore'))
+            except:
+                pass
+    return texts
+
+# Load pre texts
+def load_pre(manifest, max_chars=10000):
+    texts = []
+    for entry in manifest:
+        path = Path('data_files') / os.path.basename(entry)
+        if path.exists():
+            try:
+                txt = path.read_text(encoding='utf-8', errors='ignore')
+                texts.append(txt[:max_chars])
+            except:
+                pass
+    return texts
+
+# Build index
+def build_index(texts, model_name="all-MiniLM-L6-v2"):
+    model = SentenceTransformer(model_name)
+    embs = model.encode(texts, convert_to_numpy=True, normalize_embeddings=True)
+    if _USE_FAISS:
+        index = faiss.IndexFlatIP(embs.shape[1])
+        index.add(embs)
+        return index, embs
+    return embs, embs
+
+# Retrieve
+def retrieve(query, index, embeddings, texts, model_name="all-MiniLM-L6-v2", k=5):
+    model = SentenceTransformer(model_name)
+    q_emb = model.encode([query], convert_to_numpy=True, normalize_embeddings=True)[0]
+    if _USE_FAISS:
+        _, I = index.search(q_emb.reshape(1, -1), k)
+        return [texts[i] for i in I[0]]
+    sims = np.dot(embeddings, q_emb) / (np.linalg.norm(embeddings, axis=1) * np.linalg.norm(q_emb))
+    idx = sims.argsort()[-k:][::-1]
+    return [texts[i] for i in idx]
+
+# Grammar corrector
+gc_tok = AutoTokenizer.from_pretrained("vennify/t5-base-grammar-correction")
+gc_model = AutoModelForSeq2SeqLM.from_pretrained("vennify/t5-base-grammar-correction")
+gc_pipe = hf_pipeline("text2text-generation", model=gc_model, tokenizer=gc_tok)
+
+def correct_grammar(text):
+    try:
+        return gc_pipe(text, max_length=512, do_sample=False)[0]["generated_text"]
+    except:
+        return text
+
+# Generator
+def generate_answer(query, snippets, model_name='gpt2', max_tokens=150):
+    tok = GenTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+    pipe = TextGenerationPipeline(model=model, tokenizer=tok, device=-1)
+    prompt = "\n\n".join(snippets) + f"\n\nQuestion: {query}\nAnswer:"
+    try:
+        out = pipe(prompt, max_length=len(tok(prompt)["input_ids"])+max_tokens, truncation=True, do_sample=False)
+        return out[0]['generated_text'][len(prompt):].strip()
+    except:
+        return ""
+
+# Main
+def main():
+    # Start WebSocket server\    threading.Thread(target=start_ws_server, daemon=True).start()
+    cache = load_cache()
+    data = load_json(DATA_FILE)
+    word = load_json(WORD_FILE)
+    pre  = load_json(PRE_FILE)
+    texts = load_texts(data) + load_pre(pre)
+    index, embeddings = build_index(texts)
+    while True:
+        try:
+            user = input("User: ")
+            if not user: continue
+            low = user.lower().strip()
+            if low in ("exit","quit"):
+                print("Chondria-Alpha: Goodbye!")
+                break
+            if low.startswith("remember "):
+                mem = user[9:].strip()
+                cache.setdefault("memories",[]).append(mem); save_cache(cache)
+                print(f"Chondria-Alpha: I'll remember '{mem}'.")
+                continue
+            if low in ("show memories","list memories","what do you remember"):
+                mems = cache.get("memories",[])
+                if mems:
+                    print("Chondria-Alpha: Memories:")
+                    for m in mems: print(f" - {m}")
+                else:
+                    print("Chondria-Alpha: I have no memories.")
+                continue
+            # Process\            corrected = correct_grammar(user)
+            snippets = retrieve(corrected, index, embeddings, texts)
+            answer = generate_answer(corrected, snippets)
+            print(f"Chondria-Alpha: {answer}")
+            # Generate key and broadcast
+            key = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+            if ws_loop:
+                asyncio.run_coroutine_threadsafe(broadcast(key), ws_loop)
+        except KeyboardInterrupt:
+            print("Chondria-Alpha: Interrupted. Goodbye!")
+            sys.exit(0)
+        except:
+            pass
+
+if __name__ == '__main__':
+    main()
 
 tv == th4d_94mmmf345Ki48 nc;k
