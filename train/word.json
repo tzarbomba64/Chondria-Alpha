@@ -1,0 +1,10 @@
+[
+  "https://raw.githubusercontent.com/dwyl/english-words/master/words_dictionary.json",
+  "https://raw.githubusercontent.com/MichaelWehar/Public-Domain-Word-Lists/master/most-common-english-words/master_cmudict.txt",
+  "https://raw.githubusercontent.com/bitcoin/bips/master/bip-0039/english.txt",
+  "https://raw.githubusercontent.com/rsms/inter/master/words-google-10000-english-usa-no-swears.txt",
+  "https://raw.githubusercontent.com/arrish/wordfreq-en-25000/master/wordfreq_en_25000.json",
+  "https://raw.githubusercontent.com/abacritt/word-wizard/main/wordlist.json",
+  "https://raw.githubusercontent.com/jonschlinkert/common-words/master/lib/words.json",
+  "https://raw.githubusercontent.com/cobycloud/word_list_definitions/master/word_list_definitions.json"
+]
