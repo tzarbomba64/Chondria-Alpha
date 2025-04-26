@@ -1,47 +1,64 @@
-<!DOCTYPE html><!DOCTYPE html>
+<!DOCTYPE html><!DOCTYPE html><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Chondria-Alpha Client</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        #log { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: auto; margin-top: 20px; }
+        body { font-family: Arial, sans-serif; background: #121212; color: #eee; padding: 20px; }
+        #log { background: #1e1e1e; padding: 10px; height: 200px; overflow-y: auto; margin-bottom: 10px; }
+        #chat { margin-top: 20px; }
+        input[type="text"] { width: 80%; padding: 10px; }
+        button { padding: 10px; }
     </style>
 </head>
 <body>
-    <h1>Chondria-Alpha Client</h1>
-    <input type="text" id="message" placeholder="Type your message...">
-    <button onclick="sendMessage()">Send</button>
-
+    <h1>Chondria-Alpha</h1>
     <div id="log"></div>
 
+    <div id="chat">
+        <input type="text" id="message" placeholder="Type your message...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
     <script>
-        async function sendMessage() {
-            const msg = document.getElementById('message').value;
-            if (!msg) return;
+        const logDiv = document.getElementById('log');
 
-            const response = await fetch('/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: msg })
-            });
+        function updateLog() {
+            fetch('/log')
+                .then(response => response.json())
+                .then(keys => {
+                    logDiv.innerHTML = '';
+                    keys.forEach(key => {
+                        const div = document.createElement('div');
+                        div.textContent = key;
+                        logDiv.appendChild(div);
+                    });
+                });
+        }
 
-            const data = await response.json();
-            if (data.key) {
-                const logDiv = document.getElementById('log');
-                const entry = document.createElement('div');
-                entry.textContent = `Key: ${data.key}`;
-                logDiv.appendChild(entry);
+        function sendMessage() {
+            const messageInput = document.getElementById('message');
+            const message = messageInput.value.trim();
+            if (message !== "") {
+                fetch('/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.response) {
+                        console.log('Chondria-Alpha:', data.response);
+                    }
+                    messageInput.value = '';
+                    updateLog();
+                });
             }
         }
 
-        setInterval(async () => {
-            const logDiv = document.getElementById('log');
-            logDiv.innerHTML = '';
-        }, 5000);
+        setInterval(updateLog, 5000);
     </script>
 </body>
 </html>
-
 
 tv == th4d_94mmmf345Ki48 nc;k
