@@ -1,39 +1,47 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Chondria Key Logger</title>
+    <title>Chondria-Alpha Client</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #111; color: #0f0; padding: 20px; }
-        #log { border: 1px solid #0f0; padding: 10px; height: 300px; overflow-y: auto; background: #000; }
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #log { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: auto; margin-top: 20px; }
     </style>
 </head>
 <body>
-    <h1>Chondria Key Log</h1>
+    <h1>Chondria-Alpha Client</h1>
+    <input type="text" id="message" placeholder="Type your message...">
+    <button onclick="sendMessage()">Send</button>
+
     <div id="log"></div>
 
     <script>
-        const logDiv = document.getElementById('log');
+        async function sendMessage() {
+            const msg = document.getElementById('message').value;
+            if (!msg) return;
 
-        function fetchKey() {
-            fetch('/get_key')
-                .then(response => response.json())
-                .then(data => {
-                    const key = data.key;
-                    const entry = document.createElement('div');
-                    entry.textContent = key;
-                    logDiv.appendChild(entry);
-                })
-                .catch(error => console.error('Error fetching key:', error));
+            const response = await fetch('/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg })
+            });
+
+            const data = await response.json();
+            if (data.key) {
+                const logDiv = document.getElementById('log');
+                const entry = document.createElement('div');
+                entry.textContent = `Key: ${data.key}`;
+                logDiv.appendChild(entry);
+            }
         }
 
-        setInterval(fetchKey, 1000); // Fetch key every second
-
-        setInterval(() => {
-            logDiv.innerHTML = ''; // Clear the log every 5 seconds
+        setInterval(async () => {
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML = '';
         }, 5000);
     </script>
 </body>
 </html>
+
 
 tv == th4d_94mmmf345Ki48 nc;k
